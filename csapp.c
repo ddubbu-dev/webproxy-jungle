@@ -669,8 +669,15 @@ ssize_t rio_readn(int fd, void *usrbuf, size_t n) {
     // Q. file descriptor - server descriptor 같은건지? file open 함수가 없는데..
     while (nleft > 0) {
         if ((nread = read(fd, bufp, nleft)) < 0) {
-            if (errno == EINTR) /* Interrupted by sig handler return */
-                nread = 0;      /* and call read() again */
+            if (errno == EINTR)
+                /**
+                 * 1. Interrupted by sig handler return
+                 * - errno : C 표준 라이브러리에서 제공하는 전역변수, 최근 발생한 오류에 대한 코드 값을 저장
+                 * - EINTR : Interrupted system call
+                 *
+                 * 2. and call read() again
+                 * */
+                nread = 0;
             else
                 return -1; /* errno set by read() */
         } else if (nread == 0)
@@ -715,9 +722,12 @@ ssize_t rio_writen(int fd, void *usrbuf, size_t n) {
  */
 /* $begin rio_read */
 static ssize_t rio_read(rio_t *rp, char *usrbuf, size_t n) {
-    int cnt;
+    /**
+     * rio_t: fd, internal buffer 정보를 저장하는 구조체, 버퍼링된 I/O 처리
+     */
 
-    while (rp->rio_cnt <= 0) { /* Refill if buf is empty */
+    int cnt;
+    while (rp->rio_cnt <= 0) { /* 내부 버퍼에 데이터 없음 => Refill if buf is empty */
         rp->rio_cnt = read(rp->rio_fd, rp->rio_buf, sizeof(rp->rio_buf));
         if (rp->rio_cnt < 0) {
             if (errno != EINTR) /* Interrupted by sig handler return */
@@ -725,7 +735,7 @@ static ssize_t rio_read(rio_t *rp, char *usrbuf, size_t n) {
         } else if (rp->rio_cnt == 0) /* EOF */
             return 0;
         else
-            rp->rio_bufptr = rp->rio_buf; /* Reset buffer ptr */
+            rp->rio_bufptr = rp->rio_buf; /* 내부 버퍼의 시작주소로 설정해 버퍼에서 데이터를 읽을 준비 */
     }
 
     /* Copy min(n, rp->rio_cnt) bytes from internal buf to user buf */
@@ -745,8 +755,8 @@ static ssize_t rio_read(rio_t *rp, char *usrbuf, size_t n) {
 /* $begin rio_readinitb */
 void rio_readinitb(rio_t *rp, int fd) {
     rp->rio_fd = fd;
-    rp->rio_cnt = 0;
-    rp->rio_bufptr = rp->rio_buf;
+    rp->rio_cnt = 0;              // 읽을 수 있는 남은 바이트 수
+    rp->rio_bufptr = rp->rio_buf; // 읽기 버퍼의 현재 위치
 }
 /* $end rio_readinitb */
 
