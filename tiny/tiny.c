@@ -67,21 +67,17 @@ void doit(int fd) {
     }
 
     if (is_static) {
-        /* Serve static contents */
-        if (!(S_ISREG(sbuf.st_mode) && (sbuf.st_mode & S_IXUSR))) {
-            // S_IXUSR: 소유자 실행 권한 비트 꺼내기, ALLOC 매크로 같은 느낌
+        if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
             clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
             return;
         }
 
         serve_static(fd, filename, sbuf.st_size);
     } else {
-        /* Serve dynamic content */
-        if (!(S_ISREG(sbuf.st_mode) && (sbuf.st_mode & S_IXUSR))) {
+        if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
             clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't run the CGI program");
             return;
         }
-
         serve_dynamic(fd, filename, cgiargs);
     }
 }
@@ -98,11 +94,10 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longms
             body);
     sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
     sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
-    sprintf(body, "%s<hr><en>The Tiny Web server</em>\r\n", body);
-
-    /* Print the HTTP response */
+    sprintf(body, "%s<hr><em>The Tiny Web server</em>\r\n", body);
     sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
     Rio_writen(fd, buf, strlen(buf));
+    sprintf(buf, "Content-type: text/html\r\n");
     sprintf(buf, "Content-length: %d\r\n\r\n", (int)strlen(body));
     Rio_writen(fd, buf, strlen(buf));
     Rio_writen(fd, body, strlen(body));
@@ -127,11 +122,11 @@ int parse_uri(char *uri, char *filename, char *cgiargs) {
         /* Static content */
         strcpy(cgiargs, "");
         strcpy(filename, ".");
-        strcpy(filename, uri);
+        strcat(filename, uri);
         if (uri[strlen(uri) - 1] == '/')
             // Q. strlen(uri) == 1 조건도 추가되어야하지 않나?
             // 이러면 기본 파일만 서빙될 것 같음
-            strcat(filename, "tiny/home.html");
+            strcat(filename, "home.html");
         return 1;
     } else {
         /* Dynamic content */
@@ -159,6 +154,7 @@ void serve_static(int fd, char *filename, int filesize) {
     sprintf(buf, "%sConnection: close\r\n", buf);
     sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
     sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
+    Rio_writen(fd, buf, strlen(buf));
     printf("Response headers:\n");
     printf("%s", buf);
 
@@ -177,13 +173,13 @@ void get_filetype(char *filename, char *filetype) {
     if (strstr(filename, ".html"))
         strcpy(filetype, "text/html");
     else if (strstr(filename, ".gif"))
-        strcpy(filename, "img/gif");
+        strcpy(filetype, "image/gif");
     else if (strstr(filename, ".png"))
-        strcpy(filename, "img/png");
+        strcpy(filetype, "image/png");
     else if (strstr(filename, ".jpg"))
-        strcpy(filename, "img/jpeg");
+        strcpy(filetype, "image/jpg");
     else
-        strcpy(filename, "text/plain");
+        strcpy(filetype, "text/plain");
 }
 
 void serve_dynamic(int fd, char *filename, char *cgiargs) {
