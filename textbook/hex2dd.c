@@ -1,10 +1,14 @@
 /**
+ *
+ * [컴파일 및 링크]
+ * $ cd textbook
+ * $ gcc -I.. hex2dd.c ../csapp.c -o hex2dd.exe
+ *
  * [실행 방법]
- * $ gcc ./textbook/hex2dd.c -o ./textbook/hex2dd.exe
- * $ ./textbook/hex2dd.exe 0x400
+ * `$ ./hex2dd.exe 0x400`
  */
 
-#include "_csapp.h"
+#include "csapp.h"
 
 int main(int argc, char **argv) {
     uint16_t hex_host_byte;
