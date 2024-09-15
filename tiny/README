@@ -20,7 +20,9 @@ To install Tiny:
    Type "tar xvf tiny.tar" in a clean directory. 
 
 To run Tiny:
-   Run "tiny <port>" on the server machine, 
+   Run `$ cd tiny`
+   Run `$ make clean && make`
+   Run `./tiny <port>` on the server machine, 
 	e.g., "tiny 8000".
    Point your browser at Tiny: 
 	static content: http://<host>:8000
