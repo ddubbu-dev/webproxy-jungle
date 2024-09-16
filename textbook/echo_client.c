@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
     char clinetRequest[MAXLINE];  // 사용자 입력
     char serverResponse[MAXLINE]; // 서버로부터의 응답을 저장할 버퍼
 
-    Rio_readinitb(&rio, socketfd);                                  // rio 초기화 및 socket fd 연결
+    Rio_readinitb(&rio, socketfd);                                  // rio 구조체를 socketfd와 연결된 소켓으로 초기화
     while (Fgets(clinetRequest, MAXLINE, stdin) != NULL) {          // (표준 입력, stdin) 한줄씩 사용자 입력 읽기
         Rio_writen(socketfd, clinetRequest, strlen(clinetRequest)); // [4] client request
         Rio_readlineb(&rio, serverResponse, MAXLINE);               // [5] server response (최대 MAXLINE 한 줄 응답 기대)
