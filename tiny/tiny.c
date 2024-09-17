@@ -175,6 +175,35 @@ void update_info_from_uri(char *uri, char *filename, char *cgiargs, int *is_stat
     }
 }
 
+// TODO: 숙제문제 11.7 : MP4 비디오 파일 처리
+// (고민) 스트리밍 응답
+// req, res 둘다 (Content-Range 헤더) 설정 필요
+ssize_t serve_stream(int socketfd, int srcfd, size_t n) {
+    size_t nleft = n;
+    ssize_t nread;
+    char readbuf[MAXBUF];
+
+    while (nleft > 0) {
+        if ((nread = read(srcfd, readbuf, MAXBUF < nleft ? MAXBUF : nleft)) < 0) {
+            if (errno == EINTR) {
+                nread = 0;
+            } else {
+                free(readbuf);
+                return -1;
+            }
+        } else if (nread == 0) {
+            break; // EOF
+        }
+        nleft -= nread;
+
+        printf("nread=%s", nread);
+        Rio_writen(socketfd, readbuf, nread);
+    }
+
+    free(readbuf);
+    return n - nleft; // Return the number of bytes sent
+}
+
 void serve_static(int fd, char *filename, int filesize) {
     int srcfd;
     char *srcp, filetype[MAXLINE], res_header[MAXBUF];
@@ -191,11 +220,12 @@ void serve_static(int fd, char *filename, int filesize) {
     printf("%s", res_header);
 
     /* Send response body to client */
-    srcfd = Open(filename, O_RDONLY, 0);                        // open file
-    srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // file을 메모리에 직접 매핑
-    Close(srcfd);                                               // close file
-    Rio_writen(fd, srcp, filesize);                             // 응답
-    Munmap(srcp, filesize);                                     // mmap으로 매핑된 메모리 영역 해제
+    srcp = Malloc(filesize);
+    srcfd = Open(filename, O_RDONLY, 0); // open file
+    Read(srcfd, srcp, filesize);         // read file
+    Close(srcfd);                        // close file
+    Rio_writen(fd, srcp, filesize);      // 응답
+    free(srcp);
 }
 
 /**
