@@ -88,6 +88,9 @@ void doit(int fd) {
             response_clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't run the CGI program");
             return;
         }
+
+        // setenv("CONTENT_TYPE", "html", 1); // html 페이지로 응답
+        setenv("CONTENT_TYPE", "json", 1); // application/json 으로 응답
         serve_dynamic(fd, filename, cgiargs);
     }
 }
@@ -266,8 +269,13 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
     if (Fork() == 0) {
         /* Child */
         /* Real server would set all CGI vars here */
-        setenv("QUERY_STRING", cgiargs, 1);   // (마지막 인자, 1): overwrite
-        Dup2(fd, STDOUT_FILENO);              // CGI program 출력을 client에 바로 응답
+        setenv("QUERY_STRING", cgiargs, 1); // (마지막 인자, 1): overwrite
+        Dup2(fd, STDOUT_FILENO);            // CGI program 출력을 client에 바로 응답
+
+        // tip: Dup2 주석 처리 시 임시로 직접 응답
+        // Rio_writen(fd, "Connection: close\r\n", strlen("Connection: close\r\n"));
+        // Rio_writen(fd, "Content-type: application/json\r\n\r\n", strlen("Content-type: application/json\r\n\r\n"));
+
         Execve(filename, emptylist, environ); // Run CGI program
     }
     Wait(NULL); /* Parent waits for and reaps child */

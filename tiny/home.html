@@ -1,8 +1,44 @@
 <html>
-<head><title>test</title></head>
+<head>
+  <title>test</title>
+  <meta charset="utf-8">
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  <script>
+    async function handleSubmit(){
+      var x = $('#param_x').val();
+      var y = $('#param_y').val();
+
+      await fetch(`/cgi-bin/adder?${x}&${y}`)
+              .then((res) => res.json())
+              .then((data) => {
+                console.log(data);
+                $('#result').text(`x + y = ${data.result}`);
+              })
+              .catch((error) => {
+                console.error('Error:', error);
+              });
+    }
+  </script>
+</head>
 <body> 
-<img align="middle" src="godzilla.gif">
-<video src="earth_sample.mp4" controls loop>
-Dave O'Hallaron
+  <h1>Dynamic Serve : adder(x,y)</h1>
+  <div>
+    <input id="param_x" type="number" placeholder="x" />
+    <input id="param_y" type="number" placeholder="y"/>
+  </div>
+  <div id="result"></div>
+  <br/>
+  <button onclick="handleSubmit()">더하기</button>
+
+  <!-- <h1>Static Serve</h1>
+  <div>
+    <div><b>이미지</b></div>
+    <img src="godzilla.gif">
+  </div>
+  <br/>
+  <div>
+    <div><b>비디오</b></div>
+    <video src="earth_sample.mp4" controls loop>
+  </div> -->
 </body>
 </html>
