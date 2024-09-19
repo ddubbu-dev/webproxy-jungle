@@ -62,7 +62,7 @@ void doit(int fd) {
 
     /* Parse URI and Update */
     int is_static = 0;
-    char filename[MAXLINE], cgiargs[MAXLINE];
+    char filename[MAXLINE] = "", cgiargs[MAXLINE] = "";
     update_info_from_uri(uri, filename, cgiargs, &is_static);
 
     struct stat file_state;
@@ -156,8 +156,8 @@ void update_info_from_uri(char *uri, char *filename, char *cgiargs, int *is_stat
 
         // 초기화
         strcpy(cgiargs, "");
-        strcpy(filename, "."); // 현재 작업디렉토리
-        strcat(filename, uri); // . + {uri}
+        strcat(filename, "."); // 현재 작업디렉토리
+        strcat(filename, uri);
 
         if (uri[strlen(uri) - 1] == ROOT_URI)
             strcat(filename, "home.html");
