@@ -64,3 +64,8 @@ dkms.conf
 
 # Textbook practice
 *.exe
+
+
+# Download output
+.noproxy/
+.proxy/

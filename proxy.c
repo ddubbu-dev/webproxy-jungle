@@ -10,7 +10,9 @@ static const char *user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64;
 
 #define HTTP_VERSION "HTTP/1.0"
 
+void *thread(void *vargp);
 void doit(int fd);
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         printf(stderr, "usage: %s <port>\n", argv[0]);
@@ -18,18 +20,30 @@ int main(int argc, char **argv) {
     }
 
     int listenfd = Open_listenfd(argv[1]);
-    int connfd;
+    int *connfdp;
     socklen_t clientaddr_size;
     struct sockaddr_storage clientaddr;
     char hostname[MAXLINE], port[MAXLINE];
+    pthread_t tid;
+
     while (1) { // 서버 계속 실행
         clientaddr_size = sizeof(clientaddr);
-        connfd = Accept(listenfd, (SA *)&clientaddr, &clientaddr_size); // clinet <-> proxy
+        connfdp = Malloc(sizeof(int));
+        *connfdp = Accept(listenfd, (SA *)&clientaddr, &clientaddr_size); // clinet <-> proxy
+        Pthread_create(&tid, NULL, thread, connfdp);
         Getnameinfo((SA *)&clientaddr, clientaddr_size, hostname, MAXLINE, port, MAXLINE, 0);
         printf("Accepted connection from (%s, %s)\n", hostname, port);
-        doit(connfd);
-        Close(connfd);
+
     }
+}
+
+void *thread(void *vargp) {
+    int connfd = *((int *)vargp);
+    Pthread_detach(Pthread_self());
+    Free(vargp);
+    doit(connfd);
+    Close(connfd);
+    return NULL;
 }
 
 /**
