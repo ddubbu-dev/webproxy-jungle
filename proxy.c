@@ -68,9 +68,16 @@ void doit(int client_fd) {
     Rio_writen(proxy_fd, http_start_line, strlen(http_start_line));
     printf("req: %s", http_start_line);
 
+    // Rio_writen(proxy_fd, "Host: localhost\r\n", strlen("Host: localhost\r\n"));
+    // Rio_writen(proxy_fd, "Accept: */*\r\n", strlen("Accept: */*\r\n"));
+
     int readn;
-    while (readn = Rio_readlineb(&client_rio, req_client_to_proxy, MAXBUF) != 0) { // client > (request) > proxy > tiny
-        Rio_writen(proxy_fd, req_client_to_proxy, strlen(req_client_to_proxy));    // client > proxy > (request) > tiny
+    while (readn = Rio_readlineb(&client_rio, req_client_to_proxy, MAXBUF) != 0) {                 // client > (request) > proxy > tiny
+        if (strncmp(req_client_to_proxy, "Proxy-Connection:", strlen("Proxy-Connection:")) == 0) { // 헤더 수정
+            strcpy(req_client_to_proxy, "Connection: close\r\n");                                  // TODO: value는 뒤에 것 파싱해서 넣어줄 필요 있음
+        }
+
+        Rio_writen(proxy_fd, req_client_to_proxy, strlen(req_client_to_proxy)); // client > proxy > (request) > tiny
         printf("req: %s", req_client_to_proxy);
 
         if (strcmp(req_client_to_proxy, "\r\n") == 0) { // TODO: 요청 끝 맞는지 확인 필요
@@ -83,11 +90,20 @@ void doit(int client_fd) {
     Rio_readinitb(&proxy_rio, proxy_fd);
     char res_proxy_from_tiny[MAXBUF] = "";
 
-    while (readn = Rio_readlineb(&proxy_rio, res_proxy_from_tiny, MAXBUF) != 0) { // clinet < proxy < (response) < tiny
-        Rio_writen(client_fd, res_proxy_from_tiny, MAXBUF);                       // client < (response) < proxy < tiny
+    while (readn = Rio_readlineb(&proxy_rio, res_proxy_from_tiny, MAXBUF) != 0) {      // clinet < proxy < (response) < tiny
+        if (strncmp(req_client_to_proxy, "Connection:", strlen("Connection:")) == 0) { // 헤더 수정
+            strcpy(req_client_to_proxy, "Proxy-Connection: close\r\n");                // TODO: value는 뒤에 것 파싱해서 넣어줄 필요 있음
+        }
+
+        Rio_writen(client_fd, res_proxy_from_tiny, MAXBUF); // client < (response) < proxy < tiny
         printf("res: %s", res_proxy_from_tiny);
     }
+    // Rio_writen(client_fd, "\r\n\r\n", strlen("\r\n\r\n")); // client < (response) < proxy < tiny
     Close(proxy_fd);
     printf("\n\n================ [PROXY][END] ================\n\n");
     printf("Close Connection..");
 }
+
+// tiny 응답 처리 시
+// (v) 1. Header Proxy-Connection 떼고 Connection 로 넣어주기
+// 2. content-length 만큼 준다.
