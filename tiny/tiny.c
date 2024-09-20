@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
         Getnameinfo((SA *)&clientaddr, clientaddr_size, hostname, MAXLINE, port, MAXLINE, 0); // 소켓 주소 구조체를 대응되는 호스트, 서비스 스트링으로 변환
         printf("Accepted connection from (%s, %s)\n", hostname, port);
         doit(connfd); // serve (static/dynamic) content
+        printf("Close Connection..\n");
         Close(connfd);
     }
 }
@@ -50,7 +51,9 @@ void doit(int fd) {
     /* Read request line and headers */
     char http_info[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
     rio_t rio;
-    Rio_readinitb(&rio, fd);                 // rio 구조체를 connfd와 연결된 소켓으로 초기화
+    Rio_readinitb(&rio, fd); // rio 구조체를 connfd와 연결된 소켓으로 초기화
+
+    printf("\n\n================ [TINY][READ][REQUEST] ================\n\n");
     Rio_readlineb(&rio, http_info, MAXLINE); // Read request line
     printf("Request headers: %s\n", http_info);
     sscanf(http_info, "%s %s %s", method, uri, version); // http_info 분해
@@ -219,6 +222,7 @@ void serve_static(int fd, char *filename, int filesize) {
     sprintf(res_header, "%sContent-length: %d\r\n", res_header, filesize);
     sprintf(res_header, "%sContent-type: %s\r\n\r\n", res_header, filetype);
     Rio_writen(fd, res_header, strlen(res_header));
+    printf("\n\n================ [TINY][SEND][RESPONSE] ================\n\n");
     printf("Response headers:\n");
     printf("%s", res_header);
 

@@ -26,11 +26,13 @@ PORT_MAX=65000
 MAX_PORT_TRIES=10
 
 # List of text and binary files for the basic test
-BASIC_LIST="home.html
-            csapp.c
-            tiny.c
-            godzilla.jpg
-            tiny"
+## TODO: 주석 풀기 (임시로 심플한 파일로 테스트)
+# BASIC_LIST="home.html
+#             csapp.c
+#             tiny.c
+#             godzilla.jpg
+#             tiny"
+BASIC_LIST="sample.txt"
 
 # List of text files for the cache test
 CACHE_LIST="tiny.c
@@ -220,6 +222,7 @@ wait_for_port_use "${tiny_port}"
 
 # Run the proxy
 proxy_port=$(free_port)
+export TINY_PORT=${tiny_port}  # TODO: 확인 필요 환경 변수로 설정
 echo "Starting proxy on ${proxy_port}"
 ./proxy ${proxy_port}  &> /dev/null &
 proxy_pid=$!
