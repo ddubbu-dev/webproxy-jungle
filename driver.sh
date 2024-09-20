@@ -222,7 +222,6 @@ wait_for_port_use "${tiny_port}"
 
 # Run the proxy
 proxy_port=$(free_port)
-export TINY_PORT=${tiny_port}  # TODO: 확인 필요 환경 변수로 설정
 echo "Starting proxy on ${proxy_port}"
 ./proxy ${proxy_port}  &> /dev/null &
 proxy_pid=$!

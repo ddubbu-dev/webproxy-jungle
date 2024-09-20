@@ -1,5 +1,14 @@
 #include "csapp.h"
-#define DEV_TINY_PORT "7000"
+
+/* Recommended max cache and object sizes */
+#define MAX_CACHE_SIZE 1049000
+#define MAX_OBJECT_SIZE 102400
+
+/* You won't lose style points for including this long line in your code */
+static const char *user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
+                                    "Firefox/10.0.3\r\n";
+
+#define HTTP_VERSION "HTTP/1.0"
 
 void doit(int fd);
 int main(int argc, char **argv) {
@@ -27,27 +36,39 @@ int main(int argc, char **argv) {
  * client > proxy > tiny
  */
 void doit(int client_fd) {
-    // char *tiny_host = "127.0.0.1", *tiny_port = getenv("TINY_PORT"); // prd
-    char *tiny_host = "127.0.0.1", *tiny_port = DEV_TINY_PORT; // dev
+    // HTTP 시작라인에서 (e.g tiny server) 타겟 호스트 분리하기
+    char req_client_to_proxy[MAXBUF];
+    char method[MAXBUF], url[MAXBUF], version[MAXBUF];
+    char tiny_protocal[MAXBUF] = "http", tiny_hostname[MAXBUF], uri[MAXBUF] = "";
+    int tiny_port;
+    char tiny_port_str[MAXBUF];
 
     rio_t client_rio;
     Rio_readinitb(&client_rio, client_fd);
-    int readn;
-    char req_client_to_proxy[MAXBUF] = "";
-    int proxy_fd = Open_clientfd(tiny_host, tiny_port); // proxy <-> tiny
+    Rio_readlineb(&client_rio, req_client_to_proxy, MAXBUF); // (req) HTTP 시작라인 읽기
+
+    // sscanf로 호스트, 포트, URI 분리
+    sscanf(req_client_to_proxy, "%s %s %s\r\n", method, url, version);
+    int splitted_cnt = sscanf(url, "http://%99[^:]:%d%99[^\n]", tiny_hostname, &tiny_port, uri);
+
+    if (splitted_cnt < 3) { // URI가 없으면 빈 문자열 처리
+        uri[0] = '/';
+    }
+
+    sprintf(tiny_port_str, "%d", tiny_port);
+
+    printf("Hostname: %s\n", tiny_hostname);
+    printf("Port: %d\n", tiny_port);
+    printf("URI: %s\n", uri);
 
     printf("\n\n================ [PROXY][REQUEST][TO_TINY] ================\n\n");
-    // HTTP 시작라인에서 (e.g tiny server) 타겟 호스트 분리하기
-    char method[MAXBUF], url[MAXBUF], version[MAXBUF], uri[MAXBUF];
-    Rio_readlineb(&client_rio, req_client_to_proxy, MAXBUF); // (req) HTTP 시작라인 읽기
-    sscanf(req_client_to_proxy, "%s %s%s %s", method, url, version);
-    sscanf(url, "http://%*[^/]%s", uri);
-
+    int proxy_fd = Open_clientfd(tiny_hostname, tiny_port_str); // proxy <-> tiny
     char http_start_line[MAXBUF];
-    sprintf(http_start_line, "%s %s %s\r\n", method, uri, version);
+    sprintf(http_start_line, "%s %s %s\r\n", method, uri, HTTP_VERSION);
     Rio_writen(proxy_fd, http_start_line, strlen(http_start_line));
     printf("req: %s", http_start_line);
 
+    int readn;
     while (readn = Rio_readlineb(&client_rio, req_client_to_proxy, MAXBUF) != 0) { // client > (request) > proxy > tiny
         Rio_writen(proxy_fd, req_client_to_proxy, strlen(req_client_to_proxy));    // client > proxy > (request) > tiny
         printf("req: %s", req_client_to_proxy);
@@ -56,6 +77,7 @@ void doit(int client_fd) {
             break;
         }
     }
+
     printf("\n\n================ [PROXY][RESPONSE][FROM_TINY] ================\n\n");
     rio_t proxy_rio;
     Rio_readinitb(&proxy_rio, proxy_fd);
