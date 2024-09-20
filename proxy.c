@@ -73,7 +73,7 @@ void doit(int client_fd) {
     Rio_writen(proxy_fd, "Host: localhost", strlen("localhost"));
     Rio_writen(proxy_fd, user_agent_hdr, strlen(user_agent_hdr));
     Rio_writen(proxy_fd, "Connection: close\r\n", strlen("Connection: close\r\n"));
-    Rio_writen(proxy_fd, "Accept: text/plain\r\n", strlen("Accept: text/plain\r\n"));
+    Rio_writen(proxy_fd, "Accept: */*\r\n", strlen("Accept: */*\r\n"));
     Rio_writen(proxy_fd, "\r\n", strlen("\r\n"));
 
     printf("\n\n================ [PROXY][RESPONSE][FROM_TINY] ================\n\n");
