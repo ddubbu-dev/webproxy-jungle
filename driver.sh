@@ -27,12 +27,12 @@ MAX_PORT_TRIES=10
 
 # List of text and binary files for the basic test
 ## TODO: 주석 풀기 (임시로 심플한 파일로 테스트)
-# BASIC_LIST="home.html
-#             csapp.c
-#             tiny.c
-#             godzilla.jpg
-#             tiny"
-BASIC_LIST="sample.txt"
+BASIC_LIST="home.html
+            csapp.c
+            tiny.c
+            godzilla.jpg
+            tiny"
+# BASIC_LIST="sample.txt"
 
 # List of text files for the cache test
 CACHE_LIST="tiny.c

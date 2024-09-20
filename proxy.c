@@ -37,11 +37,11 @@ int main(int argc, char **argv) {
  */
 void doit(int client_fd) {
     // HTTP 시작라인에서 (e.g tiny server) 타겟 호스트 분리하기
-    char req_client_to_proxy[MAXBUF];
-    char method[MAXBUF], url[MAXBUF], version[MAXBUF];
-    char tiny_protocal[MAXBUF] = "http", tiny_hostname[MAXBUF], uri[MAXBUF] = "";
+    char req_client_to_proxy[MAXBUF] = "";
+    char method[MAXBUF] = "", url[MAXBUF] = "", version[MAXBUF] = "";
+    char tiny_protocal[MAXBUF] = "http", tiny_hostname[MAXBUF] = "", uri[MAXBUF] = "";
     int tiny_port;
-    char tiny_port_str[MAXBUF];
+    char tiny_port_str[MAXBUF] = "";
 
     rio_t client_rio;
     Rio_readinitb(&client_rio, client_fd);
@@ -52,7 +52,7 @@ void doit(int client_fd) {
     int splitted_cnt = sscanf(url, "http://%99[^:]:%d%99[^\n]", tiny_hostname, &tiny_port, uri);
 
     if (splitted_cnt < 3) { // URI가 없으면 빈 문자열 처리
-        uri[0] = '/';
+        strcpy(uri, "/");
     }
 
     sprintf(tiny_port_str, "%d", tiny_port);
@@ -63,47 +63,35 @@ void doit(int client_fd) {
 
     printf("\n\n================ [PROXY][REQUEST][TO_TINY] ================\n\n");
     int proxy_fd = Open_clientfd(tiny_hostname, tiny_port_str); // proxy <-> tiny
-    char http_start_line[MAXBUF];
+    char http_start_line[MAXBUF] = "";
     sprintf(http_start_line, "%s %s %s\r\n", method, uri, HTTP_VERSION);
+
+    printf("http_start_line: %s", http_start_line);
     Rio_writen(proxy_fd, http_start_line, strlen(http_start_line));
-    printf("req: %s", http_start_line);
 
-    // Rio_writen(proxy_fd, "Host: localhost\r\n", strlen("Host: localhost\r\n"));
-    // Rio_writen(proxy_fd, "Accept: */*\r\n", strlen("Accept: */*\r\n"));
-
-    int readn;
-    while (readn = Rio_readlineb(&client_rio, req_client_to_proxy, MAXBUF) != 0) {                 // client > (request) > proxy > tiny
-        if (strncmp(req_client_to_proxy, "Proxy-Connection:", strlen("Proxy-Connection:")) == 0) { // 헤더 수정
-            strcpy(req_client_to_proxy, "Connection: close\r\n");                                  // TODO: value는 뒤에 것 파싱해서 넣어줄 필요 있음
-        }
-
-        Rio_writen(proxy_fd, req_client_to_proxy, strlen(req_client_to_proxy)); // client > proxy > (request) > tiny
-        printf("req: %s", req_client_to_proxy);
-
-        if (strcmp(req_client_to_proxy, "\r\n") == 0) { // TODO: 요청 끝 맞는지 확인 필요
-            break;
-        }
-    }
+    // 헤더 직접 생성
+    Rio_writen(proxy_fd, "Host: localhost", strlen("localhost"));
+    Rio_writen(proxy_fd, user_agent_hdr, strlen(user_agent_hdr));
+    Rio_writen(proxy_fd, "Connection: close\r\n", strlen("Connection: close\r\n"));
+    Rio_writen(proxy_fd, "Accept: text/plain\r\n", strlen("Accept: text/plain\r\n"));
+    Rio_writen(proxy_fd, "\r\n", strlen("\r\n"));
 
     printf("\n\n================ [PROXY][RESPONSE][FROM_TINY] ================\n\n");
     rio_t proxy_rio;
     Rio_readinitb(&proxy_rio, proxy_fd);
     char res_proxy_from_tiny[MAXBUF] = "";
 
-    while (readn = Rio_readlineb(&proxy_rio, res_proxy_from_tiny, MAXBUF) != 0) {      // clinet < proxy < (response) < tiny
-        if (strncmp(req_client_to_proxy, "Connection:", strlen("Connection:")) == 0) { // 헤더 수정
-            strcpy(req_client_to_proxy, "Proxy-Connection: close\r\n");                // TODO: value는 뒤에 것 파싱해서 넣어줄 필요 있음
+    int readn;
+    while ((readn = Rio_readlineb(&proxy_rio, res_proxy_from_tiny, MAXBUF)) != 0) { // clinet < proxy < (response) < tiny
+        if (strncmp(req_client_to_proxy, "Connection:", 11) == 0) {                 // 헤더 수정
+            strcpy(req_client_to_proxy, "Proxy-Connection: close\r\n");             // TODO: value는 뒤에 것 파싱해서 넣어줄 필요 있음
         }
 
-        Rio_writen(client_fd, res_proxy_from_tiny, MAXBUF); // client < (response) < proxy < tiny
+        Rio_writen(client_fd, res_proxy_from_tiny, readn); // client < (response) < proxy < tiny
         printf("res: %s", res_proxy_from_tiny);
     }
-    // Rio_writen(client_fd, "\r\n\r\n", strlen("\r\n\r\n")); // client < (response) < proxy < tiny
+
     Close(proxy_fd);
     printf("\n\n================ [PROXY][END] ================\n\n");
     printf("Close Connection..");
 }
-
-// tiny 응답 처리 시
-// (v) 1. Header Proxy-Connection 떼고 Connection 로 넣어주기
-// 2. content-length 만큼 준다.
