@@ -10,6 +10,7 @@ static const char *user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64;
 
 void action(int client_proxy_fd);
 void update_tiny_info(char *uri, char *path, char *hostname, char *port);
+void *thread(void *vargp);
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -18,17 +19,27 @@ int main(int argc, char *argv[]) {
     }
 
     int listenfd = Open_listenfd(argv[1]);
-    int connfd;
+    int *connfdp;
+    pthread_t tid;
 
     struct sockaddr_storage clientaddr;
     socklen_t clientlen;
     while (1) {
-        connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
-        action(connfd);
-        Close(connfd);
+        connfdp = Malloc(sizeof(int));
+        *connfdp = Accept(listenfd, (SA *)&clientaddr, &clientlen);
+        Pthread_create(&tid, NULL, thread, connfdp);
     }
 
     return 0;
+}
+
+void *thread(void *vargp) {
+    int connfd = *((int *)vargp);
+    Pthread_detach(pthread_self());
+    Free(vargp);
+    action(connfd);
+    Close(connfd);
+    return NULL;
 }
 
 void action(int client_proxy_fd) {
