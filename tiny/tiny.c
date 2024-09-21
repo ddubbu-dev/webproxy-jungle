@@ -7,6 +7,21 @@
  * - 요청/응답 과정에서 (method, uri) 등의 정보가 설정됨
  * - 응답시 header, body 포맷이 존재함
  */
+
+/*
+
+// 실행파일
+$ ./proxy 8000
+$ ./tiny 8080
+
+// telnet 접속
+telnet localhost 8000
+
+// telnet 접속 후
+GET http://localhost:8080/ HTTP/1.0
+Host: localhost
+*/
+
 #include "csapp.h"
 #define ROOT_URI '/'
 
@@ -142,10 +157,11 @@ void read_requesthdrs(rio_t *rp) {
 
     char buf[MAXLINE];
 
-    Rio_readlineb(rp, buf, MAXLINE);
-    while (strcmp(buf, "\r\n")) { // 개행 만나기 전까지 반복
-        Rio_readlineb(rp, buf, MAXLINE);
-        printf("%s", buf);
+    while (Rio_readlineb(rp, buf, MAXLINE) > 0) {
+        if (strcmp(buf, "\r\n") == 0) {
+            break;
+        }
+        printf("[req] %s", buf);
     }
 
     return;

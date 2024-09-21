@@ -8,104 +8,69 @@
 static const char *user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
                                     "Firefox/10.0.3\r\n";
 
-#define HTTP_VERSION "HTTP/1.0"
+void action(int client_proxy_fd);
+void update_tiny_info(char *uri, char *path, char *hostname, char *port);
 
-void *thread(void *vargp);
-void doit(int fd);
-
-int main(int argc, char **argv) {
+int main(int argc, char *argv[]) {
     if (argc != 2) {
-        printf(stderr, "usage: %s <port>\n", argv[0]);
-        exit(1);
+        fprintf(stderr, "usage: %s <port>\n", argv[0]);
+        exit(EXIT_FAILURE);
     }
 
     int listenfd = Open_listenfd(argv[1]);
-    int *connfdp;
-    socklen_t clientaddr_size;
+    int connfd;
+
     struct sockaddr_storage clientaddr;
-    char hostname[MAXLINE], port[MAXLINE];
-    pthread_t tid;
-
-    while (1) { // 서버 계속 실행
-        clientaddr_size = sizeof(clientaddr);
-        connfdp = Malloc(sizeof(int));
-        *connfdp = Accept(listenfd, (SA *)&clientaddr, &clientaddr_size); // clinet <-> proxy
-        Pthread_create(&tid, NULL, thread, connfdp);
-        Getnameinfo((SA *)&clientaddr, clientaddr_size, hostname, MAXLINE, port, MAXLINE, 0);
-        printf("Accepted connection from (%s, %s)\n", hostname, port);
-
+    socklen_t clientlen;
+    while (1) {
+        connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
+        action(connfd);
+        Close(connfd);
     }
+
+    return 0;
 }
 
-void *thread(void *vargp) {
-    int connfd = *((int *)vargp);
-    Pthread_detach(Pthread_self());
-    Free(vargp);
-    doit(connfd);
-    Close(connfd);
-    return NULL;
-}
+void action(int client_proxy_fd) {
+    char client_request[MAXBUF], method[MAXBUF], uri[MAXBUF], version[MAXBUF];
 
-/**
- * client > proxy > tiny
- */
-void doit(int client_fd) {
-    // HTTP 시작라인에서 (e.g tiny server) 타겟 호스트 분리하기
-    char req_client_to_proxy[MAXBUF] = "";
-    char method[MAXBUF] = "", url[MAXBUF] = "", version[MAXBUF] = "";
-    char tiny_protocal[MAXBUF] = "http", tiny_hostname[MAXBUF] = "", uri[MAXBUF] = "";
-    int tiny_port;
-    char tiny_port_str[MAXBUF] = "";
-
+    printf("===========[Client --(Request)--> Proxy]===========\n");
     rio_t client_rio;
-    Rio_readinitb(&client_rio, client_fd);
-    Rio_readlineb(&client_rio, req_client_to_proxy, MAXBUF); // (req) HTTP 시작라인 읽기
+    Rio_readinitb(&client_rio, client_proxy_fd);
 
-    // sscanf로 호스트, 포트, URI 분리
-    sscanf(req_client_to_proxy, "%s %s %s\r\n", method, url, version);
-    int splitted_cnt = sscanf(url, "http://%99[^:]:%d%99[^\n]", tiny_hostname, &tiny_port, uri);
+    int readn = Rio_readlineb(&client_rio, client_request, MAXBUF); // client --(req)-> proxy > tiny
+    sscanf(client_request, "%s %s %s", method, uri, version);
 
-    if (splitted_cnt < 3) { // URI가 없으면 빈 문자열 처리
-        strcpy(uri, "/");
+    if (strcmp(method, "GET") != 0) { //  (simple) http request 유효성 체크
+        char err_msg[MAXLINE] = "NOT VALID request: Allow only [GET] method";
+        Rio_writen(client_proxy_fd, err_msg, strlen(err_msg));
+        return;
     }
 
-    sprintf(tiny_port_str, "%d", tiny_port);
+    char path[MAXBUF], hostname[MAXBUF], port[MAXBUF];
+    update_tiny_info(uri, path, hostname, port); // uri parse를 통한 정보 업데이트
 
-    printf("Hostname: %s\n", tiny_hostname);
-    printf("Port: %d\n", tiny_port);
-    printf("URI: %s\n", uri);
+    printf("===========[Proxy --(Request)--> Tiny]===========\n");
+    int proxy_tiny_fd = Open_clientfd(hostname, port);
+    char http_first_line[MAXBUF];
+    sprintf(http_first_line, "%s %s %s\r\n", method, path, version);
+    Rio_writen(proxy_tiny_fd, http_first_line, strlen(http_first_line)); // client > proxy --(req)-> tiny
+    printf("[req] %s", http_first_line);
 
-    printf("\n\n================ [PROXY][REQUEST][TO_TINY] ================\n\n");
-    int proxy_fd = Open_clientfd(tiny_hostname, tiny_port_str); // proxy <-> tiny
-    char http_start_line[MAXBUF] = "";
-    sprintf(http_start_line, "%s %s %s\r\n", method, uri, HTTP_VERSION);
-
-    printf("http_start_line: %s", http_start_line);
-    Rio_writen(proxy_fd, http_start_line, strlen(http_start_line));
-
-    // 헤더 직접 생성
-    Rio_writen(proxy_fd, "Host: localhost", strlen("localhost"));
-    Rio_writen(proxy_fd, user_agent_hdr, strlen(user_agent_hdr));
-    Rio_writen(proxy_fd, "Connection: close\r\n", strlen("Connection: close\r\n"));
-    Rio_writen(proxy_fd, "Accept: */*\r\n", strlen("Accept: */*\r\n"));
-    Rio_writen(proxy_fd, "\r\n", strlen("\r\n"));
-
-    printf("\n\n================ [PROXY][RESPONSE][FROM_TINY] ================\n\n");
-    rio_t proxy_rio;
-    Rio_readinitb(&proxy_rio, proxy_fd);
-    char res_proxy_from_tiny[MAXBUF] = "";
-
-    int readn;
-    while ((readn = Rio_readlineb(&proxy_rio, res_proxy_from_tiny, MAXBUF)) != 0) { // clinet < proxy < (response) < tiny
-        if (strncmp(req_client_to_proxy, "Connection:", 11) == 0) {                 // 헤더 수정
-            strcpy(req_client_to_proxy, "Proxy-Connection: close\r\n");             // TODO: value는 뒤에 것 파싱해서 넣어줄 필요 있음
-        }
-
-        Rio_writen(client_fd, res_proxy_from_tiny, readn); // client < (response) < proxy < tiny
-        printf("res: %s", res_proxy_from_tiny);
+    printf("===========[Proxy <--(Response)-- Tiny]===========\n");
+    while (Rio_readlineb(&client_rio, client_request, MAXBUF) > 0) {       // client --(req)-> proxy > tiny
+        Rio_writen(proxy_tiny_fd, client_request, strlen(client_request)); // client > proxy --(req)-> tiny
+        printf("[req] %s", client_request);
     }
+}
 
-    Close(proxy_fd);
-    printf("\n\n================ [PROXY][END] ================\n\n");
-    printf("Close Connection..");
+void update_tiny_info(char *uri, char *path, char *hostname, char *port) {
+    // 포트가 있을 경우만 포트 추출
+    if (strstr(uri, ":")) {
+        sscanf(uri, "http://%99[^:]:%9[^/]/", hostname, port);
+    } else {
+        sscanf(uri, "http://%99[^/]/", hostname);
+    }
+    sscanf(uri, "http://%*[^/]%s", path); // TODO: path (/ 없을때 기본값) 설정 필요함
+    printf("[update_tiny_info] hostname=%s, port=%s, path=%s\n", hostname, port, path);
 }
