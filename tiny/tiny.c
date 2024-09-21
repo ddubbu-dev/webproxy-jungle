@@ -20,6 +20,8 @@ void response_clienterror(int fd, char *cause, char *errnum, char *shortmsg, cha
 
 // textbook/echo_server.c 와 유사
 int main(int argc, char **argv) {
+    signal(SIGPIPE, SIG_IGN);
+
     if (argc != 2) { // cli args : <exe_file_name> <port>
         fprintf(stderr, "usage: %s <port>\n", argv[0]);
         exit(1);
@@ -139,12 +141,12 @@ void read_requesthdrs(rio_t *rp) {
 
     char buf[MAXLINE];
 
-    Rio_readlineb(rp, buf, MAXLINE);
-    while (strcmp(buf, "\r\n")) { // 개행 만나기 전까지 반복
-        Rio_readlineb(rp, buf, MAXLINE);
-        printf("%s", buf);
+    while (Rio_readlineb(rp, buf, MAXLINE) > 0) {
+        if (strcmp(buf, "\r\n") == 0) {
+            break;
+        }
+        printf("% s", buf);
     }
-
     return;
 }
 
