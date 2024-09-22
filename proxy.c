@@ -95,20 +95,38 @@ void action(int client_proxy_fd) {
     }
     printf("===========[Proxy  <--(Response)--  Tiny]===========\n");
     printf("===========[Client <--(Response)-- Proxy]===========\n");
-    char *res_p = (char *)malloc(MAXBUF * sizeof(char)); // 메모리 할당
-    res_p[0] = '\0';                                     // 빈 문자열로 초기화
+    // char *res_p = (char *)malloc(10000000 * sizeof(char)); // 메모리 할당
+    // res_p[0] = '\0';                                       // 빈 문자열로 초기화
+    int content_length = 0;
 
-    char server_response[MAXBUF];
+    char server_response_header[MAXBUF];
     rio_t proxy_rio;
     Rio_readinitb(&proxy_rio, proxy_tiny_fd);
-    while ((readn = Rio_readlineb(&proxy_rio, server_response, MAXBUF)) > 0) { // client > proxy <-(res)-- tiny
-        Rio_writen(client_proxy_fd, server_response, readn);                   // client <-(res)-- proxy < tiny
-        strcat(res_p, server_response);
-        printf("[res] %s", server_response);
+
+    // header 읽기
+    // TODO: res_p에서 header 분리되면서 발생한 이슈
+    while ((readn = Rio_readlineb(&proxy_rio, server_response_header, MAXBUF)) > 0) { // client > proxy <-(res)-- tiny
+        Rio_writen(client_proxy_fd, server_response_header, readn);                   // client <-(res)-- proxy < tiny
+        printf("[res] %s", server_response_header);
+
+        if (server_response_header == "\r\n") {
+            break; // header 읽기 끝!
+        }
+
+        if (strncmp(server_response_header, "Content-length:", 15) == 0) {
+            sscanf(server_response_header, "Content-length: %d\r\n", &content_length);
+        }
     }
 
+    // body 읽기
+    char server_response_body[content_length];
+
+    Rio_readnb(&proxy_rio, server_response_body, content_length);
+    Rio_writen(client_proxy_fd, server_response_body, content_length); // client <-(res)-- proxy < tiny
+
     req_p = (RequestInfo *)malloc(sizeof(RequestInfo));
-    pushFront(dll, req_p, res_p);
+    strcpy(req_p->method, method);
+    pushFront(dll, req_p, server_response_body);
 }
 
 void update_tiny_info(char *uri, char *path, char *hostname, char *port) {
