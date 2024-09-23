@@ -7,9 +7,15 @@ typedef struct RequestInfo {
     char path[MAXLINE];
 } RequestInfo;
 
+typedef struct ResponseInfo {
+    char *header; // malloc, free 필요
+    char *body;   // malloc, free 필요
+    int body_size;
+} ResponseInfo;
+
 typedef struct CacheNode {
     RequestInfo req_p;
-    char *res_p; // malloc, free 필요
+    char *res_p;
     int res_size;
     struct CacheNode *prev;
     struct CacheNode *next;
