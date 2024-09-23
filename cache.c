@@ -21,9 +21,6 @@ CacheNode *createNode(RequestInfo req, ResponseInfo res) {
     node->req = req; // 구조체 값 복사
 
     // response 복사
-    node->res.header = (char *)malloc(strlen(res.header) + 1);
-    strcpy(node->res.header, res.header);
-
     node->res.body = (char *)malloc(res.body_size);
     memcpy(node->res.body, res.body, res.body_size);
 
@@ -69,7 +66,6 @@ void popBack(DLL *dll) {
 
     dll->sum_of_cache_object_size -= pop_node->res.body_size;
 
-    free(pop_node->res.header);
     free(pop_node->res.body);
     free(pop_node);
 }
@@ -139,7 +135,6 @@ void deleteList(DLL *dll) {
     CacheNode *delete_node = dll->head->next;
     while (delete_node != dll->head) {
         CacheNode *next_node = delete_node->next;
-        free(delete_node->res.header);
         free(delete_node->res.body);
         free(delete_node);
         delete_node = next_node;

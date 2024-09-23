@@ -144,12 +144,11 @@ void action(int client_proxy_fd) {
     printf("[res] %s\n", response_body);
     printf("======================\n[THE END]\n======================\n");
 
+    // 크기 확인 후 캐시 객체 추가
     if (content_length <= MAX_OBJECT_SIZE) {
-        // 캐시 저장
         ResponseInfo res_info;
         res_info.body_size = content_length;
         res_info.body = response_body;
-        res_info.header = strdup(response_header); // 헤더 복사
         pushFront(cache_list, req_info, res_info);
     }
 

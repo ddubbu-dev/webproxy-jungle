@@ -11,8 +11,8 @@ typedef struct RequestInfo {
 } RequestInfo;
 
 typedef struct ResponseInfo {
-    char *header; // malloc, free 필요
-    char *body;   // malloc, free 필요
+    // char *header;  // TODO: 현재는 직접 생성 중
+    char *body;
     int body_size;
 } ResponseInfo;
 
