@@ -32,9 +32,7 @@ BASIC_LIST="home.html
             tiny.c
             godzilla.jpg
             tiny"
-# BASIC_LIST="sample.txt"
-# BASIC_LIST="tiny.c"
-
+            
 # List of text files for the cache test
 CACHE_LIST="tiny.c
             home.html
