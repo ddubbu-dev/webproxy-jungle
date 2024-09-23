@@ -1,10 +1,6 @@
 #include "cache.h"
 #include "csapp.h"
 
-/* Recommended max cache and object sizes */
-#define MAX_CACHE_SIZE 1049000
-#define MAX_OBJECT_SIZE 102400
-
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
                                     "Firefox/10.0.3\r\n";
@@ -148,14 +144,16 @@ void action(int client_proxy_fd) {
     printf("[res] %s\n", response_body);
     printf("======================\n[THE END]\n======================\n");
 
-    // 캐시 저장
-    ResponseInfo res_info;
-    res_info.body_size = content_length;
-    res_info.body = response_body;
-    res_info.header = strdup(response_header); // 헤더 복사
+    if (content_length <= MAX_OBJECT_SIZE) {
+        // 캐시 저장
+        ResponseInfo res_info;
+        res_info.body_size = content_length;
+        res_info.body = response_body;
+        res_info.header = strdup(response_header); // 헤더 복사
+        pushFront(cache_list, req_info, res_info);
+    }
 
-    pushFront(cache_list, req_info, res_info);
-    free(response_body); // 메모리 해제
+    free(response_body);
 }
 
 void update_resource_server_info(char *uri, char *path, char *hostname, char *port) {

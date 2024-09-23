@@ -1,8 +1,11 @@
 #include "csapp.h"
 #define METHOD_MAX_LEN 8
+/* Recommended max cache and object sizes */
+#define MAX_CACHE_SIZE 1049000
+#define MAX_OBJECT_SIZE 102400
 
+// [확장성 대응] request 식별을 위한 속성이 늘어날 것을 대비
 typedef struct RequestInfo {
-    // [확장성 대응] request 식별을 위한 속성이 늘어날 것을 대비
     char method[METHOD_MAX_LEN];
     char path[MAXLINE];
 } RequestInfo;
@@ -20,9 +23,9 @@ typedef struct CacheNode {
     struct CacheNode *next;
 } CacheNode;
 
-typedef struct DoublyLinkedList {
+typedef struct CacheList {
     CacheNode *head;
-    int size;
+    int sum_of_cache_object_size;
 } DLL;
 
 DLL *createDoublyLinkedList();

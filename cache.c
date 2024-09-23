@@ -10,7 +10,7 @@ DLL *createDoublyLinkedList() {
 
     new_dll->head = head_node;
     head_node->next = head_node->prev = head_node;
-    new_dll->size = 0;
+    new_dll->sum_of_cache_object_size = 0;
     return new_dll;
 }
 
@@ -44,16 +44,18 @@ void pushFront(DLL *dll, RequestInfo req, ResponseInfo res) {
     dll->head->next = new_node;
     new_node->prev = dll->head;
 
-    dll->size++;
+    dll->sum_of_cache_object_size += res.body_size; // the actual web objects (요청 응답 bytes 수만 카운트함)
     printf("[push front] method=%s, path=%s\n", new_node->req.method, new_node->req.path);
     printDll(dll);
 
-    // TODO: 개수 세서 오버시 popBack
+    if (dll->sum_of_cache_object_size > MAX_CACHE_SIZE) {
+        popBack(dll);
+    }
 }
 
 // [LRU] 뒤에서 과거정보 제거
 void popBack(DLL *dll) {
-    if (dll->size == 0) {
+    if (dll->sum_of_cache_object_size == 0) {
         printf("List is empty, cannot pop.\n");
         return;
     }
@@ -65,12 +67,11 @@ void popBack(DLL *dll) {
     printf("[pop back] method=%s, path=%s\n", pop_node->req.method, pop_node->req.path);
     printDll(dll);
 
+    dll->sum_of_cache_object_size -= pop_node->res.body_size;
+
     free(pop_node->res.header);
     free(pop_node->res.body);
     free(pop_node);
-    dll->size--;
-
-    // TODO: 제거 후 모든 속성 free
 }
 
 CacheNode *search(DLL *dll, RequestInfo req_info) {
@@ -121,7 +122,7 @@ void findAndMoveFront(DLL *dll, RequestInfo req) {
 
 void printDll(DLL *dll) {
     printf("[앞] ");
-    if (dll->size == 0) {
+    if (!dll->head->next) {
         printf("[]\n");
         return;
     }
