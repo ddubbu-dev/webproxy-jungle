@@ -14,9 +14,8 @@ typedef struct ResponseInfo {
 } ResponseInfo;
 
 typedef struct CacheNode {
-    RequestInfo req_p;
-    char *res_p;
-    int res_size;
+    RequestInfo req;
+    ResponseInfo res;
     struct CacheNode *prev;
     struct CacheNode *next;
 } CacheNode;
@@ -26,16 +25,7 @@ typedef struct DoublyLinkedList {
     int size;
 } DLL;
 
-// 밖으로 보낼 함수만
 DLL *createDoublyLinkedList();
-CacheNode *search(DLL *, RequestInfo);
-void pushFront(DLL *dll, RequestInfo req_p, char *res_p, int res_size);
+CacheNode *search(DLL *dll, RequestInfo req);
+void pushFront(DLL *dll, RequestInfo req, ResponseInfo res);
 void moveFront(DLL *dll, CacheNode *move_node);
-
-// 미방출할 함수들
-CacheNode *createNode(RequestInfo req_p, char *res_p, int res_size);
-void popBack(DLL *dll);
-CacheNode *search(DLL *dll, RequestInfo req_p);
-void findAndMoveFront(DLL *dll, RequestInfo req_p);
-void printDll(DLL *dll);
-void deleteList(DLL *dll);

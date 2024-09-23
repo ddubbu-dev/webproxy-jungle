@@ -83,14 +83,14 @@ void action(int client_proxy_fd) {
         sprintf(buf, "%s 200 OK\r\n", PROXY_HTTP_VER); // 시작 라인
         Rio_writen(client_proxy_fd, buf, strlen(buf));
 
-        sprintf(buf, "Content-length: %d\r\n", cache_node->res_size);
+        sprintf(buf, "Content-length: %d\r\n", cache_node->res.body_size);
         Rio_writen(client_proxy_fd, buf, strlen(buf));
 
         Rio_writen(client_proxy_fd, "Proxy-Connection: close\r\n", strlen("Proxy-Connection: close\r\n"));
         Rio_writen(client_proxy_fd, "\r\n", strlen("\r\n")); // 헤더 끝 표시
 
         // body 전달
-        Rio_writen(client_proxy_fd, cache_node->res_p, cache_node->res_size);
+        Rio_writen(client_proxy_fd, cache_node->res.body, cache_node->res.body_size);
         moveFront(cache_list, cache_node);
         return;
     }
@@ -148,9 +148,14 @@ void action(int client_proxy_fd) {
     printf("[res] %s\n", response_body);
     printf("======================\n[THE END]\n======================\n");
 
-    strcpy(req_info.method, method);
-    strcpy(req_info.path, path);
-    pushFront(cache_list, req_info, response_body, content_length);
+    // 캐시 저장
+    ResponseInfo res_info;
+    res_info.body_size = content_length;
+    res_info.body = response_body;
+    res_info.header = strdup(response_header); // 헤더 복사
+
+    pushFront(cache_list, req_info, res_info);
+    free(response_body); // 메모리 해제
 }
 
 void update_resource_server_info(char *uri, char *path, char *hostname, char *port) {
