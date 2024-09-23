@@ -14,10 +14,21 @@ DLL *newDll() {
     return new_dll;
 }
 
-CacheNode *createNode(RequestInfo *req_p, char *res_p) {
+CacheNode *createNode(RequestInfo *req_p, char *res_p, int res_size) {
     CacheNode *node = (CacheNode *)calloc(1, sizeof(CacheNode));
-    node->req_p = req_p;
-    node->res_p = res_p;
+
+    // 깊은 복사
+    node->req_p = (RequestInfo *)malloc(sizeof(RequestInfo));
+    strcpy(node->req_p->method, req_p->method);
+    node->req_p->path = (char *)malloc(strlen(req_p->path) + 1);
+    strcpy(node->req_p->path, req_p->path);
+
+    // 응답도 복사
+    node->res_p = (char *)malloc(res_size + 1); // +1 for the null terminator
+    memcpy(node->res_p, res_p, res_size);
+    node->res_p[res_size] = '\0'; // Ensure null-terminated string
+    node->res_size = res_size;
+
     node->prev = NULL;
     node->next = NULL;
 
@@ -25,8 +36,8 @@ CacheNode *createNode(RequestInfo *req_p, char *res_p) {
 }
 
 // 앞에 최신정보 넣기
-void pushFront(DLL *dll, RequestInfo *req_p, char *res_p) {
-    CacheNode *new_node = createNode(req_p, res_p);
+void pushFront(DLL *dll, RequestInfo *req_p, char *res_p, int res_size) {
+    CacheNode *new_node = createNode(req_p, res_p, res_size);
 
     new_node->next = dll->head->next;
     dll->head->next->prev = new_node;

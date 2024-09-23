@@ -16,6 +16,8 @@ void *thread(void *vargp);
 DLL *dll;
 
 int main(int argc, char *argv[]) {
+    signal(SIGPIPE, SIG_IGN);
+
     dll = newDll();
 
     int listenfd = Open_listenfd(argv[1]);
@@ -45,6 +47,7 @@ void *thread(void *vargp) {
 RequestInfo *req_p;
 void action(int client_proxy_fd) {
     char client_request[MAXBUF], method[MAXBUF], uri[MAXBUF], version[MAXBUF];
+    char path[MAXBUF], hostname[MAXBUF], port[MAXBUF];
 
     printf("===========[Client --(Request)--> Proxy]===========\n");
     rio_t client_rio;
@@ -59,29 +62,50 @@ void action(int client_proxy_fd) {
         return;
     }
 
-    char path[MAXBUF], hostname[MAXBUF], port[MAXBUF];
     update_tiny_info(uri, path, hostname, port); // uri parse를 통한 정보 업데이트
 
-    printf("===========[Proxy  --(Request)-->  Tiny]===========\n");
-    int proxy_tiny_fd = Open_clientfd(hostname, port);
     char http_first_line[MAXBUF];
     sprintf(http_first_line, "%s %s %s\r\n", method, path, version);
 
-    // 1. cache 존재 여부 체크
+    printf("===========[Proxy Cache Check]===========\n");
+
+    // cache 존재 여부 체크: YES
     // Yes: 캐시 사용
     RequestInfo *req_p = (RequestInfo *)malloc(sizeof(RequestInfo));
-    strcmp(req_p->method, method);
+    strcpy(req_p->method, method);
     req_p->path = path;
 
     CacheNode *cache_node = search(dll, req_p);
 
     if (cache_node != NULL) {
-        Rio_writen(proxy_tiny_fd, cache_node->res_p, strlen(cache_node->res_p));
+        char content_length_buf[MAXBUF];
+        sprintf(content_length_buf, "Content-length: %d\r\n", cache_node->res_size);
+
+        printf("///////////// (시작) cache hit ////////////////\n");
+        printf("[cache][res]%s", http_first_line);
+        printf("[cache][res]%s", "\r\n");
+        printf("[cache][res]Proxy-Connection: close\r\n");
+        printf("[cache][res]%s\r\n", content_length_buf);
+        printf("[cache][res] %s\n", cache_node->res_p);
+
+        Rio_writen(client_proxy_fd, "HTTP/1.1 200 OK", strlen("HTTP/1.1 200 OK"));
+        Rio_writen(client_proxy_fd, "Proxy-Connection: close\r\n", strlen("Proxy-Connection: close"));
+        Rio_writen(client_proxy_fd, content_length_buf, strlen(content_length_buf));
+        Rio_writen(client_proxy_fd, "\r\n", strlen("\r\n")); // 헤더 끝 표시
+        Rio_writen(client_proxy_fd, cache_node->res_p, cache_node->res_size);
+        printf("///////////// (끝) cache hit ////////////////\n");
         moveFront(dll, cache_node);
         return;
     }
 
-    // No: 요청 새로 보내기 > 캐시 저장
+    printf("===========[Proxy  --(Request)-->  Tiny]===========\n");
+    int proxy_tiny_fd = Open_clientfd(hostname, port);
+    if (proxy_tiny_fd <= 0) {
+        printf("Tiny 서버가 꺼졌어요. 확인해주세요\n");
+        return;
+    }
+
+    // Cache check No: 요청 새로 보내기 > 캐시 저장
     Rio_writen(proxy_tiny_fd, http_first_line, strlen(http_first_line)); // client > proxy --(req)-> tiny
     printf("[req] %s", http_first_line);
 
@@ -95,8 +119,6 @@ void action(int client_proxy_fd) {
     }
     printf("===========[Proxy  <--(Response)--  Tiny]===========\n");
     printf("===========[Client <--(Response)-- Proxy]===========\n");
-    // char *res_p = (char *)malloc(10000000 * sizeof(char)); // 메모리 할당
-    // res_p[0] = '\0';                                       // 빈 문자열로 초기화
     int content_length = 0;
 
     char server_response_header[MAXBUF];
@@ -109,24 +131,28 @@ void action(int client_proxy_fd) {
         Rio_writen(client_proxy_fd, server_response_header, readn);                   // client <-(res)-- proxy < tiny
         printf("[res] %s", server_response_header);
 
-        if (server_response_header == "\r\n") {
-            break; // header 읽기 끝!
+        // 헤더 끝 확인
+        if (strcmp(server_response_header, "\r\n") == 0) {
+            break; // 헤더 읽기 끝!
         }
 
         if (strncmp(server_response_header, "Content-length:", 15) == 0) {
             sscanf(server_response_header, "Content-length: %d\r\n", &content_length);
         }
     }
-
     // body 읽기
-    char server_response_body[content_length];
+    char *server_response_body = (char *)malloc(content_length + 1);
+    server_response_body[content_length] = '\0'; // NULL 종료 추가
 
     Rio_readnb(&proxy_rio, server_response_body, content_length);
     Rio_writen(client_proxy_fd, server_response_body, content_length); // client <-(res)-- proxy < tiny
+    printf("[res] %s\n", server_response_body);
+    printf("===========[끝]===========\n");
 
     req_p = (RequestInfo *)malloc(sizeof(RequestInfo));
     strcpy(req_p->method, method);
-    pushFront(dll, req_p, server_response_body);
+    req_p->path = path;
+    pushFront(dll, req_p, server_response_body, content_length);
 }
 
 void update_tiny_info(char *uri, char *path, char *hostname, char *port) {
